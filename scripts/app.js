@@ -78,12 +78,10 @@ const app = (() => {
       songs: document.getElementById("inp-songs"),
       apikey: document.getElementById("inp-apikey"),
       preview: document.getElementById("preview-img"),
-      discogs: document.getElementById("inp-discogs"),
       token: document.getElementById("codeberg-token"),
       filepath: document.getElementById("codeberg-music-filepath"),
       branch: document.getElementById("codeberg-branch"),
     },
-    discogsBtn: document.getElementById("btn-discogs-link"),
     deleteBtn: document.getElementById("btn-delete"),
     loadingText: document.getElementById("loading-text"),
   };
@@ -163,7 +161,7 @@ const app = (() => {
 
     const prompt = `
             Analyze this music album cover. Return ONLY a valid JSON object with keys:
-            Artist, Albumtitle, Composer, Year, songlist (array), mediumtype, recordcompany, and discogsUrl (provide a Discogs Master Release link).
+            Artist, Albumtitle, Composer, Year, songlist (array), mediumtype, and recordcompany.
             No markdown formatting or extra text.
         `;
 
@@ -230,17 +228,6 @@ const app = (() => {
     if (els.inputs.composer) els.inputs.composer.value = data.Composer || "";
     if (els.inputs.year) els.inputs.year.value = data.Year || "";
     if (els.inputs.company) els.inputs.company.value = data.recordcompany || "";
-    if (els.inputs.discogs) els.inputs.discogs.value = data.discogsUrl || "";
-
-    // Discogs Link Button
-    if (els.discogsBtn) {
-      if (data.discogsUrl && data.discogsUrl.startsWith("http")) {
-        els.discogsBtn.href = data.discogsUrl;
-        els.discogsBtn.style.display = "inline-block";
-      } else {
-        els.discogsBtn.style.display = "none";
-      }
-    }
 
     // Medium
     if (els.inputs.medium) {
@@ -273,7 +260,6 @@ const app = (() => {
       Year: els.inputs.year.value,
       mediumtype: els.inputs.medium.value,
       recordcompany: els.inputs.company.value,
-      discogsUrl: els.inputs.discogs ? els.inputs.discogs.value : "",
       songlist: els.inputs.songs.value.split("\n").filter((s) => s.trim() !== ""),
     };
 
@@ -316,7 +302,6 @@ const app = (() => {
                       <p class="album-title">${item.Albumtitle || "Unknown Album"}</p>
                       <div class="album-meta">
                           ${item.Year || "?"} • ${item.mediumtype}
-                          ${item.discogsUrl ? `• <a href="${item.discogsUrl}" target="_blank" style="color:var(--primary-color); font-size:0.75rem;" onclick="event.stopPropagation()">Discogs</a>` : ""}
                       </div>
                   </div>
               `;
