@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+        <title>AI Discography</title>
+        <link rel="stylesheet" href="styles/style.css" />
+        <script
+            src="https://cdn.counter.dev/script.js"
+            data-id="96139af8-131d-4e14-9d43-b16c553ceece"
+            data-utcoffset="1"
+        ></script>
+    </head>
+    <body>
+        <!-- Header -->
+        <header>
+            <br />
+            <div class="header-top">
+                <h2 style="margin: 0">💿 AI Discography</h2>
+                <button class="icon-btn" onclick="app.openSettings()">⚙️</button>
+            </div>
+            <div class="search-row">
+                <input
+                    type="text"
+                    id="search-input"
+                    placeholder="Search title or artist..."
+                    onkeyup="app.search()"
+                />
+                <button class="btn-primary" onclick="app.startCamera()">+ SCAN</button>
+            </div>
+        </header>
+
+        <!-- Main List -->
+        <div id="album-list"></div>
+
+        <!-- Camera Modal -->
+        <div id="camera-modal" class="modal">
+            <video id="video-feed" autoplay playsinline></video>
+            <div class="overlay-guide"></div>
+            <div class="camera-instruction">Align cover within box</div>
+            <div class="camera-controls">
+                <button
+                    class="btn-secondary"
+                    style="border-radius: 20px"
+                    onclick="app.closeCamera()"
+                >
+                    Cancel
+                </button>
+                <button class="shutter-btn" onclick="app.capture()"></button>
+            </div>
+            <canvas id="capture-canvas" style="display: none"></canvas>
+        </div>
+
+        <!-- Editor/Result Modal -->
+        <div id="editor-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Album Details</h3>
+                    <button class="icon-btn" onclick="app.closeEditor()">×</button>
+                </div>
+                <div class="modal-body">
+                    <img id="preview-img" alt="Album Preview" />
+
+                    <div class="form-group">
+                        <label>Artist</label><input type="text" id="inp-artist" />
+                    </div>
+                    <div class="form-group">
+                        <label>Album Title</label><input type="text" id="inp-album" />
+                    </div>
+                    <div class="form-group">
+                        <label>Composer</label><input type="text" id="inp-composer" />
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px">
+                        <div class="form-group">
+                            <label>Year</label><input type="text" id="inp-year" />
+                        </div>
+                        <div class="form-group">
+                            <label>Medium</label>
+                            <select id="inp-medium">
+                                <option value="CD">CD</option>
+                                <option value="Vinyl">Vinyl</option>
+                                <option value="Cassette">Cassette</option>
+                                <option value="Digital">Digital</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Record Company</label><input type="text" id="inp-company" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Song List</label><textarea id="inp-songs" rows="4"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Discogs URL</label>
+                        <div style="display: flex; gap: 10px">
+                            <!-- New Input Field -->
+                            <input
+                                type="text"
+                                id="inp-discogs"
+                                placeholder="https://www.discogs.com/..."
+                            />
+                            <!-- New View Button -->
+                            <a
+                                id="btn-discogs-link"
+                                href="#"
+                                target="_blank"
+                                class="btn-secondary"
+                                style="
+                                    text-decoration: none;
+                                    display: none;
+                                    padding: 10px;
+                                    font-size: 1.2rem;
+                                "
+                                >🔗</a
+                            >
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button
+                        class="btn-danger"
+                        id="btn-delete"
+                        style="display: none"
+                        onclick="app.deleteCurrent()"
+                    >
+                        Delete
+                    </button>
+                    <button class="btn-primary" onclick="app.saveEntry()">Save Album</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal" style="align-items: center; justify-content: center">
+            <div class="modal-content" style="height: auto">
+                <div class="modal-header">
+                    <h3>Actions</h3>
+                    <button class="icon-btn" onclick="app.closeSettings()">×</button>
+                </div>
+
+                <div class="header-links">
+                    <span
+                        id="sync-status"
+                        style="color: #555; margin-right: auto; font-size: 0.7rem"
+                        >Offline Storage Active</span
+                    >
+                    <span onclick="app.exportCodeberg()">Export to Codeberg</span>
+                    <span onclick="app.triggerImport()">Import</span>
+                    <span onclick="app.exportData()">Export</span>
+                </div>
+
+                <div class="modal-header">
+                    <h3>Settings</h3>
+                    <!-- <button class="icon-btn" onclick="app.closeSettings()">×</button> -->
+                </div>
+
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Google Gemini API Key</label>
+                        <input
+                            type="password"
+                            id="inp-apikey"
+                            placeholder="Paste your API key here"
+                        />
+                        <small style="color: #888; display: block; margin-top: 5px"
+                            >Required for AI detection. Get one at
+                            <a href="https://aistudio.google.com" target="_blank"
+                                >aistudio.google.com</a
+                            ></small
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            Codeberg Personal Access Token:
+                            <input
+                                type="password"
+                                id="codeberg-token"
+                                placeholder="your_codeberg_token"
+                            />
+                            <small
+                                >This token is stored only on your device (localStorage). Get one at
+                                <a
+                                    href="https://codeberg.org/user/settings/applications"
+                                    target="_blank"
+                                    >codeberg.org settings</a
+                                ></small
+                            >
+                        </label>
+
+                        <label>
+                            File Path in Repository:
+                            <input type="text" id="codeberg-music-filepath" value="music.json" />
+                            <small>The JSON file name in your Codeberg repository</small>
+                        </label>
+
+                        <label>
+                            Branch:
+                            <input type="text" id="codeberg-branch" value="main" />
+                            <small>Usually "main" or "master"</small>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-primary" onclick="app.saveSettings()">Save Key</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+            <div style="color: white; font-weight: bold">Analyzing Image...</div>
+        </div>
+
+        <input
+            type="file"
+            id="import-file"
+            class="hidden-input"
+            accept=".json"
+            onchange="app.importData(this)"
+        />
+
+        <script src="scripts/app.js"></script>
+        <script src="scripts/CodebergSync.js"></script>
+    </body>
+</html>
