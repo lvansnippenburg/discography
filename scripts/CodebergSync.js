@@ -201,20 +201,9 @@ var CodebergSync = {
       });
   },
 
-  // Push data to Codeberg
+  // Push data to Codeberg - returns a Promise, no UI side-effects
   pushToCodeberg: function (content, message) {
-    if (!this.config.token) {
-      alert("Please configure Codeberg settings first");
-      return;
-    }
-
-    if (!confirm("Push local database to Codeberg? This will overwrite the remote file.")) {
-      return;
-    }
-
     var self = this;
-
-    // Get current file SHA (required for update)
     var getUrl =
       this.config.baseUrl +
       "/repos/" +
@@ -226,25 +215,19 @@ var CodebergSync = {
       "?ref=" +
       this.config.branch;
 
-    fetch(getUrl, {
+    return fetch(getUrl, {
       headers: {
         Authorization: "token " + this.config.token,
         Accept: "application/json",
       },
     })
       .then(function (response) {
-        if (response.ok) {
-          return response.json();
-        } else if (response.status === 404) {
-          return null; // File doesn't exist yet
-        } else {
-          throw new Error("Failed to get file info: " + response.statusText);
-        }
+        if (response.ok) return response.json();
+        if (response.status === 404) return null;
+        throw new Error("Failed to get file info: " + response.statusText);
       })
       .then(function (fileData) {
         var sha = fileData ? fileData.sha : null;
-
-        // Update or create file
         var putUrl =
           self.config.baseUrl +
           "/repos/" +
@@ -253,17 +236,12 @@ var CodebergSync = {
           self.config.repo +
           "/contents/" +
           self.config.filepath;
-
         var body = {
           message: message,
           content: btoa(unescape(encodeURIComponent(content))),
           branch: self.config.branch,
         };
-
-        if (sha) {
-          body.sha = sha;
-        }
-
+        if (sha) body.sha = sha;
         return fetch(putUrl, {
           method: "PUT",
           headers: {
@@ -275,34 +253,15 @@ var CodebergSync = {
         });
       })
       .then(function (response) {
-        if (response.ok) {
-          alert("Successfully pushed to Codeberg");
-        } else {
-          return response.json().then(function (data) {
-            throw new Error(data.message || "Push failed");
-          });
-        }
-      })
-      .catch(function (error) {
-        alert("Push failed: " + error.message);
+        if (response.ok) return;
+        return response.json().then(function (data) {
+          throw new Error(data.message || "Push failed");
+        });
       });
   },
 
-  // Pull data from Codeberg
+  // Pull data from Codeberg - returns a Promise that resolves with a parsed album array
   pullFromCodeberg: function () {
-    if (!this.config.token) {
-      alert("Please configure Codeberg settings first");
-      return;
-    }
-
-    if (!confirm("Pull database from Codeberg? This will overwrite your local data.")) {
-      return;
-    }
-
-    var statusEl = document.getElementById("sync-status");
-    statusEl.innerHTML = '<div class="sync-progress">Pulling from Codeberg...</div>';
-    statusEl.style.display = "block";
-
     var url =
       this.config.baseUrl +
       "/repos/" +
@@ -314,34 +273,21 @@ var CodebergSync = {
       "?ref=" +
       this.config.branch;
 
-    fetch(url, {
+    return fetch(url, {
       headers: {
         Authorization: "token " + this.config.token,
         Accept: "application/json",
       },
     })
       .then(function (response) {
-        if (response.ok) {
-          return response.json();
-        } else {
-          throw new Error("Failed to fetch file: " + response.statusText);
-        }
+        if (response.ok) return response.json();
+        throw new Error("Failed to fetch file: " + response.statusText);
       })
       .then(function (data) {
         var content = decodeURIComponent(escape(atob(data.content)));
-        var success = Database.importJSON(content);
-
-        if (success) {
-          statusEl.innerHTML =
-            '<div class="sync-success">✓ Successfully pulled from Codeberg!</div>';
-          UI.displayStatistics();
-          UI.displayBrowseResults();
-        } else {
-          throw new Error("Invalid database format");
-        }
-      })
-      .catch(function (error) {
-        statusEl.innerHTML = '<div class="sync-error">✗ Pull failed: ' + error.message + "</div>";
+        var parsed = JSON.parse(content);
+        if (!Array.isArray(parsed)) throw new Error("Invalid format: expected a JSON array");
+        return parsed;
       });
   },
 

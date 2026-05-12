@@ -5,6 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>AI Discography</title>
+    <script>(function () { var t = localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light'); document.documentElement.setAttribute('data-theme', t) })();</script>
     <link rel="stylesheet" href="styles/style.css" />
     <script src="https://cdn.counter.dev/script.js" data-id="96139af8-131d-4e14-9d43-b16c553ceece"
         data-utcoffset="1"></script>
@@ -13,14 +14,58 @@
 <body>
     <!-- Header -->
     <header>
-        <br />
         <div class="header-top">
-            <h2 style="margin: 0">💿 AI Discography</h2>
-            <button class="icon-btn" onclick="app.openSettings()">⚙️</button>
+            <div class="app-title">
+                <svg class="title-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="3" />
+                </svg>
+                <h2>AI Discography</h2>
+            </div>
+            <div class="header-actions">
+                <button class="icon-btn" id="theme-toggle" onclick="app.toggleTheme()" title="Toggle theme">
+                    <svg id="icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                    </svg>
+                    <svg id="icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" style="display:none">
+                        <circle cx="12" cy="12" r="4" />
+                        <path
+                            d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                    </svg>
+                </button>
+                <button class="icon-btn" onclick="app.openSettings()" title="Settings">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                        <circle cx="12" cy="12" r="3" />
+                    </svg>
+                </button>
+            </div>
         </div>
         <div class="search-row">
-            <input type="text" id="search-input" placeholder="Search title or artist..." onkeyup="app.search()" />
-            <button class="btn-primary" onclick="app.startCamera()">+ SCAN</button>
+            <div class="search-wrapper">
+                <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                </svg>
+                <input type="text" id="search-input" placeholder="Search title or artist..." onkeyup="app.search()" />
+            </div>
+            <button class="btn-primary scan-btn" onclick="app.startCamera()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                    <circle cx="12" cy="13" r="3" />
+                </svg>
+                Scan
+            </button>
         </div>
     </header>
 
@@ -33,9 +78,7 @@
         <div class="overlay-guide"></div>
         <div class="camera-instruction">Align cover within box</div>
         <div class="camera-controls">
-            <button class="btn-secondary" style="border-radius: 20px" onclick="app.closeCamera()">
-                Cancel
-            </button>
+            <button class="btn-camera-cancel" onclick="app.closeCamera()">Cancel</button>
             <button class="shutter-btn" onclick="app.capture()"></button>
         </div>
         <canvas id="capture-canvas" style="display: none"></canvas>
@@ -46,7 +89,12 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Album Details</h3>
-                <button class="icon-btn" onclick="app.closeEditor()">×</button>
+                <button class="icon-btn" onclick="app.closeEditor()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
             <div class="modal-body">
                 <img id="preview-img" alt="Album Preview" />
@@ -77,13 +125,16 @@
                 <div class="form-group">
                     <label>Record Company</label><input type="text" id="inp-company" />
                 </div>
-
                 <div class="form-group">
                     <label>Song List</label><textarea id="inp-songs" rows="4"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn-danger" id="btn-delete" style="display: none" onclick="app.deleteCurrent()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    </svg>
                     Delete
                 </button>
                 <button class="btn-primary" onclick="app.saveEntry()">Save Album</button>
@@ -92,58 +143,63 @@
     </div>
 
     <!-- Settings Modal -->
-    <div id="settings-modal" class="modal" style="align-items: center; justify-content: center">
-        <div class="modal-content" style="height: auto">
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
             <div class="modal-header">
                 <h3>Actions</h3>
-                <button class="icon-btn" onclick="app.closeSettings()">×</button>
+                <button class="icon-btn" onclick="app.closeSettings()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
 
             <div class="header-links">
-                <span id="sync-status" style="color: #555; margin-right: auto; font-size: 0.7rem">Offline Storage
-                    Active</span>
-                <span onclick="app.exportCodeberg()">Export to Codeberg</span>
-                <span onclick="app.triggerImport()">Import</span>
-                <span onclick="app.exportData()">Export</span>
+                <span id="sync-status" class="sync-status">Offline Storage Active</span>
+                <span onclick="app.exportCodeberg()">Upload to Codeberg</span>
+                <span onclick="app.importCodeberg()">Download from Codeberg</span>
+            </div>
+            <div class="header-links">
+                <span>Local Storage</span>
+                <span onclick="app.triggerImport()">Import file</span>
+                <span onclick="app.exportData()">Export file</span>
             </div>
 
             <div class="modal-header">
                 <h3>Settings</h3>
-                <!-- <button class="icon-btn" onclick="app.closeSettings()">×</button> -->
             </div>
 
             <div class="modal-body">
                 <div class="form-group">
                     <label>Google Gemini API Key</label>
                     <input type="password" id="inp-apikey" placeholder="Paste your API key here" />
-                    <small style="color: #888; display: block; margin-top: 5px">Required for AI detection. Get one at
+                    <small class="help-text">Required for AI detection. Get one at
                         <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a></small>
                 </div>
 
                 <div class="form-group">
-                    <label>
-                        Codeberg Personal Access Token:
-                        <input type="password" id="codeberg-token" placeholder="your_codeberg_token" />
-                        <small>This token is stored only on your device (localStorage). Get one at
-                            <a href="https://codeberg.org/user/settings/applications" target="_blank">codeberg.org
-                                settings</a></small>
-                    </label>
+                    <label>Codeberg Personal Access Token</label>
+                    <input type="password" id="codeberg-token" placeholder="your_codeberg_token" />
+                    <small class="help-text">Stored only on your device. Get one at
+                        <a href="https://codeberg.org/user/settings/applications" target="_blank">codeberg.org
+                            settings</a></small>
+                </div>
 
-                    <label>
-                        File Path in Repository:
-                        <input type="text" id="codeberg-music-filepath" value="music.json" />
-                        <small>The JSON file name in your Codeberg repository</small>
-                    </label>
+                <div class="form-group">
+                    <label>File Path in Repository</label>
+                    <input type="text" id="codeberg-music-filepath" value="music.json" />
+                    <small class="help-text">The JSON file name in your Codeberg repository</small>
+                </div>
 
-                    <label>
-                        Branch:
-                        <input type="text" id="codeberg-branch" value="main" />
-                        <small>Usually "main" or "master"</small>
-                    </label>
+                <div class="form-group">
+                    <label>Branch</label>
+                    <input type="text" id="codeberg-branch" value="main" />
+                    <small class="help-text">Usually "main" or "master"</small>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-primary" onclick="app.saveSettings()">Save Key</button>
+                <button class="btn-primary" onclick="app.saveSettings()">Save Settings</button>
             </div>
         </div>
     </div>
@@ -151,7 +207,7 @@
     <!-- Loading Overlay -->
     <div id="loading-overlay">
         <div class="spinner"></div>
-        <div style="color: white; font-weight: bold">Analyzing Image...</div>
+        <div id="loading-text">Analyzing Image...</div>
     </div>
 
     <input type="file" id="import-file" class="hidden-input" accept=".json" onchange="app.importData(this)" />
