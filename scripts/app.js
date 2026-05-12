@@ -98,6 +98,11 @@ const app = (() => {
       els.inputs.filepath.value = filepath;
       branch = localStorage.getItem("codeberg_branch");
       els.inputs.branch.value = branch;
+      const savedTheme = document.documentElement.getAttribute("data-theme");
+      if (savedTheme === "dark") {
+        document.getElementById("icon-sun").style.display = "";
+        document.getElementById("icon-moon").style.display = "none";
+      }
       await renderList();
       console.log("App Initialized. DB Open.");
     } catch (err) {
@@ -311,7 +316,7 @@ const app = (() => {
 
     // Optional: Show a message if no results are found
     if (filtered.length === 0) {
-      els.list.innerHTML = `<p style="text-align:center; color:#555; margin-top:50px; width:100%;">No albums found matching "${searchTerm}".</p>`;
+      els.list.innerHTML = `<p class="empty-message">No albums found matching "${searchTerm}".</p>`;
     }
   }
 
@@ -319,11 +324,44 @@ const app = (() => {
   function search() {
     renderList(document.getElementById("search-input").value);
   }
+  function timeAgo(ts) {
+    const mins = Math.floor((Date.now() - ts) / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
+
+  async function updateSyncStatus() {
+    const el = document.getElementById("sync-status");
+    if (!el) return;
+    const allData = await dbManager.getAll();
+    const count = allData.length;
+    const lastUpload = localStorage.getItem("last_codeberg_upload");
+    let text = `${count} album${count !== 1 ? "s" : ""}`;
+    if (lastUpload) {
+      text += ` · Last uploaded ${timeAgo(parseInt(lastUpload, 10))}`;
+    } else if (localStorage.getItem("codeberg_token")) {
+      text += " · Never uploaded to Codeberg";
+    }
+    el.textContent = text;
+  }
+
   function openSettings() {
+    updateSyncStatus();
     els.modals.settings.style.display = "flex";
   }
   function closeSettings() {
     els.modals.settings.style.display = "none";
+  }
+  function toggleTheme() {
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    const newTheme = isDark ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", newTheme);
+    localStorage.setItem("theme", newTheme);
+    document.getElementById("icon-sun").style.display = newTheme === "dark" ? "" : "none";
+    document.getElementById("icon-moon").style.display = newTheme === "dark" ? "none" : "";
   }
   function closeEditor() {
     els.modals.editor.style.display = "none";
@@ -348,24 +386,65 @@ const app = (() => {
 
   // --- Import / Export ---
   async function exportData() {
-    const allData = await dbManager.getAll();
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData));
-    const a = document.createElement("a");
-    a.href = dataStr;
-    a.download = "music_db_backup.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    showLoading(true, "Exporting...");
+    try {
+      const allData = await dbManager.getAll();
+      const dataStr =
+        "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allData));
+      const a = document.createElement("a");
+      a.href = dataStr;
+      a.download = "music_db_backup.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } finally {
+      showLoading(false);
+    }
   }
 
   async function exportCodeberg() {
-    const allData = await dbManager.getAll();
-    const dataStr = JSON.stringify(allData, null, 2);
-    await CodebergSync.init();
-    await CodebergSync.pushToCodeberg(
-      dataStr,
-      "Update music database - " + new Date().toISOString(),
-    );
+    CodebergSync.loadSettings();
+    if (!CodebergSync.config.token) {
+      alert("Please configure a Codeberg token in Settings first.");
+      return;
+    }
+    if (!confirm("Upload local database to Codeberg? This will overwrite the remote file.")) return;
+    showLoading(true, "Uploading to Codeberg...");
+    try {
+      const allData = await dbManager.getAll();
+      const dataStr = JSON.stringify(allData, null, 2);
+      await CodebergSync.pushToCodeberg(
+        dataStr,
+        "Update music database - " + new Date().toISOString(),
+      );
+      localStorage.setItem("last_codeberg_upload", Date.now().toString());
+      alert(`Successfully uploaded ${allData.length} albums to Codeberg.`);
+    } catch (err) {
+      alert("Upload failed: " + err.message);
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  async function importCodeberg() {
+    CodebergSync.loadSettings();
+    if (!CodebergSync.config.token) {
+      alert("Please configure a Codeberg token in Settings first.");
+      return;
+    }
+    if (!confirm("Import from Codeberg? Matching local albums will be overwritten.")) return;
+    showLoading(true, "Downloading from Codeberg...");
+    try {
+      const items = await CodebergSync.pullFromCodeberg();
+      for (const item of items) await dbManager.save(item);
+      await renderList();
+      closeSettings();
+      alert(`Imported ${items.length} albums from Codeberg.`);
+    } catch (err) {
+      alert("Import failed: " + err.message);
+    } finally {
+      showLoading(false);
+    }
   }
 
   function triggerImport() {
@@ -375,20 +454,21 @@ const app = (() => {
   async function importData(input) {
     const file = input.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const json = JSON.parse(e.target.result);
-        if (Array.isArray(json)) {
-          for (const item of json) await dbManager.save(item);
-          await renderList();
-          alert("Imported!");
-        }
-      } catch (err) {
-        alert("Error parsing file.");
-      }
-    };
-    reader.readAsText(file);
+    showLoading(true, "Importing...");
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      if (!Array.isArray(json)) throw new Error("Expected a JSON array");
+      for (const item of json) await dbManager.save(item);
+      await renderList();
+      closeSettings();
+      alert(`Imported ${json.length} albums.`);
+    } catch (err) {
+      alert("Error importing file: " + err.message);
+    } finally {
+      showLoading(false);
+      input.value = "";
+    }
   }
 
   return {
@@ -404,9 +484,11 @@ const app = (() => {
     saveSettings,
     exportData,
     exportCodeberg,
+    importCodeberg,
     triggerImport,
     importData,
     closeEditor,
+    toggleTheme,
   };
 })();
 
