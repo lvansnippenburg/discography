@@ -1,6 +1,6 @@
 # 💿 AI Discography
 
-[See this site on the web](https://lvansnippenburg.codeberg.page/discography/)
+[See this site on the web](https://lvansnippenburg.github.io/discography/)
 
 A web app for cataloging your music collection. Point your camera at an album cover, and AI automatically extracts the metadata. Store everything offline and optionally sync to Codeberg.
 
