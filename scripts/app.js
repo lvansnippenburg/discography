@@ -41,10 +41,10 @@ const app = (() => {
         console.log("GitHub file does not exist yet (404) - expected on first run");
         return;
       }
-      console.error("Initial pull from GitHub failed:", err);
+      console.error("Initial pull from GitHub failed:", err.message || err);
       const statusEl = document.getElementById("sync-status");
       if (statusEl) {
-        statusEl.textContent = "GitHub sync error - check console";
+        statusEl.textContent = `GitHub sync error: ${err.message || "unknown error"}`;
       }
     }
   }

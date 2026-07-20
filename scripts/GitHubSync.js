@@ -90,8 +90,28 @@ var GitHubSync = (function () {
     }
 
     const data = await response.json();
-    const decoded = decodeURIComponent(escape(atob(data.content)));
-    const parsed = JSON.parse(decoded);
+
+    if (!data.content) {
+      throw new Error("No content in GitHub response - file may be empty or API response malformed");
+    }
+
+    let decoded;
+    try {
+      decoded = decodeURIComponent(escape(atob(data.content)));
+    } catch (err) {
+      throw new Error(`Failed to decode base64 content: ${err.message}`);
+    }
+
+    if (!decoded || decoded.trim() === "") {
+      throw new Error("Decoded content is empty");
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(decoded);
+    } catch (err) {
+      throw new Error(`Failed to parse JSON: ${err.message}`);
+    }
 
     if (!Array.isArray(parsed)) {
       throw new Error("Invalid format: expected a JSON array");
