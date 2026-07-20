@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Scan physical album covers with a camera
 - Use Google Gemini AI to automatically extract album metadata
 - Store and organize music collection in IndexedDB (offline-first)
-- Sync collection with Codeberg for backup/version control
+- Auto-sync collection to GitHub (push on every change, pull on first empty load)
 - Search, edit, and delete album entries
 
 This is a **vanilla JavaScript web app** with no build process, dependencies, or dev server required. Simply open `index.html` in a browser.
@@ -31,12 +31,14 @@ This is a **vanilla JavaScript web app** with no build process, dependencies, or
     - Camera/video capture functions
     - `analyzeImage()` — Calls Google Gemini API with captured image and prompt
     - Modal management (camera, editor, settings)
-    - Import/export to JSON and Codeberg
-  - Exposes public API: `init`, `startCamera`, `capture`, `closeCamera`, `saveEntry`, `deleteCurrent`, `search`, `openSettings`, `closeSettings`, `saveSettings`, `exportData`, `exportCodeberg`, `triggerImport`, `importData`, `closeEditor`
-- **scripts/CodebergSync.js** — Codeberg Git API integration
-  - Manages Codeberg settings (token, repo, file path, branch)
-  - `pushToCodeberg()` — uploads local DB as JSON file
-  - `pullFromCodeberg()` — syncs remote changes locally
+    - Import/export to JSON and GitHub
+    - Debounced auto-push on local changes; auto-pull on first empty load
+  - Exposes public API: `init`, `startCamera`, `capture`, `closeCamera`, `saveEntry`, `deleteCurrent`, `search`, `openSettings`, `closeSettings`, `saveSettings`, `exportData`, `pushGitHub`, `pullGitHub`, `triggerImport`, `importData`, `closeEditor`, `toggleTheme`
+- **scripts/GitHubSync.js** — GitHub REST API (Contents API) integration
+  - Manages GitHub settings (token, branch; owner/repo/filepath hardcoded)
+  - `pushToGitHub(content, message)` — uploads local DB as JSON file via GitHub Contents API
+  - `pullFromGitHub()` — fetches remote JSON file and validates structure
+  - `isConfigured()` — checks if GitHub token is set
   - Settings persisted to localStorage
 - **styles/style.css** — Dark theme styling (Material Design principles)
 
@@ -46,35 +48,36 @@ This is a **vanilla JavaScript web app** with no build process, dependencies, or
 2. **AI Analysis:** Base64 image + prompt sent to Google Gemini API → returns JSON with album metadata
 3. **Storage:** Album entry (image, metadata) saved to IndexedDB via `dbManager`
 4. **Display:** Albums fetched from DB, filtered by search term, rendered as cards
-5. **Sync:** Export to JSON file or push to Codeberg via Codeberg API
+5. **Sync:** Auto-push to GitHub after ~1.5s debounce (debounced & serialized); auto-pull from GitHub on first load if DB is empty
 
 ### Key Technical Decisions
 
 - **IndexedDB** for offline storage (no server required, persistent across sessions)
 - **Vanilla JS** — no framework or build tool; simpler for static deployment
 - **Google Gemini API** for image analysis (not on-device; requires API key)
-- **localStorage** for sensitive config (API keys, Codeberg token) — **plaintext, device-only**
-- **Codeberg API v1** for Git sync (not using Git CLI; REST API via fetch)
+- **localStorage** for sensitive config (API keys, GitHub token) — **plaintext, device-only**
+- **GitHub REST API (Contents API)** for Git sync (not using Git CLI; REST API via fetch; supports push, pull, sha-based updates)
+- **Auto-sync behavior**: debounced (~1.5s) + serialized auto-push on every local mutation; auto-pull on first empty load (with optional settings prompt if unconfigured)
 - **Modal pattern** for all interactions (camera, editor, settings) rather than routing
 
 ## Important Notes
 
 ### API Keys & Secrets
 - Google Gemini API key stored in `localStorage` under `geminiApiKey`
-- Codeberg token stored in `localStorage` under `codeberg_token`
+- GitHub fine-grained PAT stored in `localStorage` under `github_token`
 - **These are plaintext in browser storage** — device-only, not synced
 - Never commit API keys to repo
 
 ### Image Storage
 - Album covers stored as **data URIs (base64)** in IndexedDB
 - No server-side storage; all images stored locally
-- Codeberg sync exports images as base64 strings in JSON
+- GitHub sync exports/imports images as base64 strings in JSON
 
 ### Browser APIs Used
 - `navigator.mediaDevices.getUserMedia()` — camera access
 - `IndexedDB` — persistent client-side storage
 - `FileReader` — import JSON files
-- `Fetch API` — Gemini and Codeberg API calls
+- `Fetch API` — Gemini and GitHub API calls
 - `Canvas` — image cropping and JPEG encoding
 
 ### Gemini API Integration
@@ -83,9 +86,15 @@ This is a **vanilla JavaScript web app** with no build process, dependencies, or
 - **Output:** Expected JSON keys: `Artist`, `Albumtitle`, `Composer`, `Year`, `songlist` (array), `mediumtype`, `recordcompany`, `discogsUrl`
 - **Fallback:** If API fails, editor opens blank for manual entry
 
-### Codeberg Sync Behavior
-- Default config: repo `json_storage`, branch `discography`, file `music.json`
-- User can override in settings
-- **Push:** Overwrites remote file (destructive); requires confirmation
-- **Pull:** Overwrites local DB (destructive); requires confirmation
-- No conflict resolution or three-way merge
+### GitHub Sync Behavior
+- **Hardcoded config:** owner `lvansnippenburg`, repo `discography`, file `data/music.json`
+- **Configurable:** GitHub fine-grained PAT (token), branch (default `main`)
+- **Auto-push:** Debounced (~1.5s), serialized, fires after any local mutation (`saveEntry`, `deleteCurrent`, `importData`); no confirmation for background pushes
+- **Auto-pull:** On first app load, if local DB is empty and GitHub is configured, auto-pulls `data/music.json` and populates DB; if not configured yet, prompts user for settings, then pulls once saved
+- **Manual buttons:** Explicit "Push to GitHub" / "Pull from GitHub" buttons in settings modal (independent of debounce, require confirmation)
+- **File format:** JSON array of album objects; base64-encoded when sent/received (GitHub Contents API standard)
+- **Error handling:**
+  - 404 on initial pull = file doesn't exist yet (silently accepted, expected on first run)
+  - 404 on manual pull = file not found (user-facing alert)
+  - Other errors logged to console and surfaced to `#sync-status` for auto-pull; alerted for manual actions
+- **Overwrite behavior:** Both push and pull overwrite remote/local file respectively (destructive); no conflict resolution or three-way merge

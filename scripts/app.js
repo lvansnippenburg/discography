@@ -3,6 +3,51 @@ const app = (() => {
   let stream = null;
   let currentId = null;
   let apiKey = "";
+  let pendingInitialPull = false;
+
+  // --- GitHub Auto-Push (debounced & serialized) ---
+  let pushTimer = null;
+  let pushChain = Promise.resolve();
+
+  function scheduleAutoPush() {
+    if (!GitHubSync.isConfigured()) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(() => {
+      pushChain = pushChain
+        .then(() => performAutoPush())
+        .catch((err) => console.error("GitHub auto-push failed:", err));
+    }, 1500);
+  }
+
+  async function performAutoPush() {
+    const allData = await dbManager.getAll();
+    const dataStr = JSON.stringify(allData, null, 2);
+    await GitHubSync.pushToGitHub(
+      dataStr,
+      "Update music database - " + new Date().toISOString(),
+    );
+    localStorage.setItem("last_github_upload", Date.now().toString());
+  }
+
+  async function tryInitialPull() {
+    try {
+      const items = await GitHubSync.pullFromGitHub();
+      for (const item of items) await dbManager.save(item);
+      await renderList();
+      updateSyncStatus();
+      console.log(`Initial pull: imported ${items.length} albums from GitHub`);
+    } catch (err) {
+      if (err.status === 404) {
+        console.log("GitHub file does not exist yet (404) - expected on first run");
+        return;
+      }
+      console.error("Initial pull from GitHub failed:", err);
+      const statusEl = document.getElementById("sync-status");
+      if (statusEl) {
+        statusEl.textContent = "GitHub sync error - check console";
+      }
+    }
+  }
 
   // --- IndexedDB Manager ---
   const dbManager = {
@@ -78,9 +123,8 @@ const app = (() => {
       songs: document.getElementById("inp-songs"),
       apikey: document.getElementById("inp-apikey"),
       preview: document.getElementById("preview-img"),
-      token: document.getElementById("codeberg-token"),
-      filepath: document.getElementById("codeberg-music-filepath"),
-      branch: document.getElementById("codeberg-branch"),
+      token: document.getElementById("github-token"),
+      branch: document.getElementById("github-branch"),
     },
     deleteBtn: document.getElementById("btn-delete"),
     loadingText: document.getElementById("loading-text"),
@@ -92,18 +136,30 @@ const app = (() => {
       await dbManager.open();
       apiKey = localStorage.getItem("geminiApiKey") || "";
       els.inputs.apikey.value = apiKey;
-      token = localStorage.getItem("codeberg_token");
-      els.inputs.token.value = token;
-      filepath = localStorage.getItem("codeberg_music_filepath");
-      els.inputs.filepath.value = filepath;
-      branch = localStorage.getItem("codeberg_branch");
-      els.inputs.branch.value = branch;
+
+      // Load GitHub settings via GitHubSync (it also populates the input fields)
+      GitHubSync.loadSettings();
+
       const savedTheme = document.documentElement.getAttribute("data-theme");
       if (savedTheme === "dark") {
         document.getElementById("icon-sun").style.display = "";
         document.getElementById("icon-moon").style.display = "none";
       }
       await renderList();
+
+      // Auto-pull on empty DB at startup
+      const allData = await dbManager.getAll();
+      if (allData.length === 0) {
+        if (GitHubSync.isConfigured()) {
+          console.log("DB is empty and GitHub is configured - attempting initial pull...");
+          await tryInitialPull();
+        } else {
+          console.log("DB is empty and GitHub is not configured - prompting user for settings");
+          pendingInitialPull = true;
+          openSettings();
+        }
+      }
+
       console.log("App Initialized. DB Open.");
     } catch (err) {
       console.error(err);
@@ -271,6 +327,7 @@ const app = (() => {
     await dbManager.save(entry);
     await renderList();
     closeEditor();
+    scheduleAutoPush();
   }
 
   async function deleteCurrent() {
@@ -278,6 +335,7 @@ const app = (() => {
       await dbManager.delete(currentId);
       await renderList();
       closeEditor();
+      scheduleAutoPush();
     }
   }
 
@@ -338,12 +396,12 @@ const app = (() => {
     if (!el) return;
     const allData = await dbManager.getAll();
     const count = allData.length;
-    const lastUpload = localStorage.getItem("last_codeberg_upload");
+    const lastUpload = localStorage.getItem("last_github_upload");
     let text = `${count} album${count !== 1 ? "s" : ""}`;
     if (lastUpload) {
-      text += ` · Last uploaded ${timeAgo(parseInt(lastUpload, 10))}`;
-    } else if (localStorage.getItem("codeberg_token")) {
-      text += " · Never uploaded to Codeberg";
+      text += ` · Last synced ${timeAgo(parseInt(lastUpload, 10))}`;
+    } else if (GitHubSync.isConfigured()) {
+      text += " · Never synced to GitHub";
     }
     el.textContent = text;
   }
@@ -370,13 +428,21 @@ const app = (() => {
   function saveSettings() {
     apiKey = els.inputs.apikey.value.trim();
     localStorage.setItem("geminiApiKey", apiKey);
-    token = els.inputs.token.value.trim();
-    localStorage.setItem("codeberg_token", token);
-    filepath = els.inputs.filepath.value.trim();
-    localStorage.setItem("codeberg_music_filepath", filepath);
-    branch = els.inputs.branch.value.trim();
-    localStorage.setItem("codeberg_branch", branch);
-    closeSettings();
+    const token = els.inputs.token.value.trim();
+    localStorage.setItem("github_token", token);
+    const branch = els.inputs.branch.value.trim();
+    localStorage.setItem("github_branch", branch);
+
+    // Reload GitHub settings into GitHubSync.config
+    GitHubSync.loadSettings();
+
+    // If we were waiting for settings to be configured and now they are, do initial pull
+    if (pendingInitialPull && GitHubSync.isConfigured()) {
+      pendingInitialPull = false;
+      tryInitialPull().then(() => closeSettings());
+    } else {
+      closeSettings();
+    }
   }
 
   function showLoading(show, text = "Loading...") {
@@ -402,46 +468,52 @@ const app = (() => {
     }
   }
 
-  async function exportCodeberg() {
-    CodebergSync.loadSettings();
-    if (!CodebergSync.config.token) {
-      alert("Please configure a Codeberg token in Settings first.");
+  async function pushGitHub() {
+    GitHubSync.loadSettings();
+    if (!GitHubSync.isConfigured()) {
+      alert("Please configure a GitHub token in Settings first.");
       return;
     }
-    if (!confirm("Upload local database to Codeberg? This will overwrite the remote file.")) return;
-    showLoading(true, "Uploading to Codeberg...");
+    if (!confirm("Push local database to GitHub? This will overwrite the remote file.")) return;
+    showLoading(true, "Pushing to GitHub...");
     try {
       const allData = await dbManager.getAll();
       const dataStr = JSON.stringify(allData, null, 2);
-      await CodebergSync.pushToCodeberg(
+      await GitHubSync.pushToGitHub(
         dataStr,
         "Update music database - " + new Date().toISOString(),
       );
-      localStorage.setItem("last_codeberg_upload", Date.now().toString());
-      alert(`Successfully uploaded ${allData.length} albums to Codeberg.`);
+      localStorage.setItem("last_github_upload", Date.now().toString());
+      updateSyncStatus();
+      alert(`Successfully pushed ${allData.length} albums to GitHub.`);
     } catch (err) {
-      alert("Upload failed: " + err.message);
+      alert("Push failed: " + err.message);
     } finally {
       showLoading(false);
     }
   }
 
-  async function importCodeberg() {
-    CodebergSync.loadSettings();
-    if (!CodebergSync.config.token) {
-      alert("Please configure a Codeberg token in Settings first.");
+  async function pullGitHub() {
+    GitHubSync.loadSettings();
+    if (!GitHubSync.isConfigured()) {
+      alert("Please configure a GitHub token in Settings first.");
       return;
     }
-    if (!confirm("Import from Codeberg? Matching local albums will be overwritten.")) return;
-    showLoading(true, "Downloading from Codeberg...");
+    if (!confirm("Pull from GitHub? Matching local albums will be overwritten.")) return;
+    showLoading(true, "Pulling from GitHub...");
     try {
-      const items = await CodebergSync.pullFromCodeberg();
+      const items = await GitHubSync.pullFromGitHub();
       for (const item of items) await dbManager.save(item);
       await renderList();
+      updateSyncStatus();
       closeSettings();
-      alert(`Imported ${items.length} albums from Codeberg.`);
+      alert(`Imported ${items.length} albums from GitHub.`);
     } catch (err) {
-      alert("Import failed: " + err.message);
+      if (err.status === 404) {
+        alert("No file found on GitHub yet. You can create one by pushing local data.");
+      } else {
+        alert("Pull failed: " + err.message);
+      }
     } finally {
       showLoading(false);
     }
@@ -463,6 +535,7 @@ const app = (() => {
       await renderList();
       closeSettings();
       alert(`Imported ${json.length} albums.`);
+      scheduleAutoPush();
     } catch (err) {
       alert("Error importing file: " + err.message);
     } finally {
@@ -483,8 +556,8 @@ const app = (() => {
     closeSettings,
     saveSettings,
     exportData,
-    exportCodeberg,
-    importCodeberg,
+    pushGitHub,
+    pullGitHub,
     triggerImport,
     importData,
     closeEditor,

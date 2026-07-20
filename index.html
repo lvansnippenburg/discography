@@ -157,8 +157,8 @@
 
             <div class="header-links">
                 <span id="sync-status" class="sync-status">Offline Storage Active</span>
-                <span onclick="app.exportCodeberg()">Upload to Codeberg</span>
-                <span onclick="app.importCodeberg()">Download from Codeberg</span>
+                <span onclick="app.pushGitHub()">Push to GitHub</span>
+                <span onclick="app.pullGitHub()">Pull from GitHub</span>
             </div>
             <div class="header-links">
                 <span>Local Storage</span>
@@ -179,22 +179,15 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Codeberg Personal Access Token</label>
-                    <input type="password" id="codeberg-token" placeholder="your_codeberg_token" />
-                    <small class="help-text">Stored only on your device. Get one at
-                        <a href="https://codeberg.org/user/settings/applications" target="_blank">codeberg.org
-                            settings</a></small>
-                </div>
-
-                <div class="form-group">
-                    <label>File Path in Repository</label>
-                    <input type="text" id="codeberg-music-filepath" value="music.json" />
-                    <small class="help-text">The JSON file name in your Codeberg repository</small>
+                    <label>GitHub Personal Access Token</label>
+                    <input type="password" id="github-token" placeholder="your_github_token" />
+                    <small class="help-text">Stored only on your device. Create a fine-grained PAT at
+                        <a href="https://github.com/settings/tokens?type=beta" target="_blank">github.com settings</a></small>
                 </div>
 
                 <div class="form-group">
                     <label>Branch</label>
-                    <input type="text" id="codeberg-branch" value="main" />
+                    <input type="text" id="github-branch" value="main" />
                     <small class="help-text">Usually "main" or "master"</small>
                 </div>
             </div>
@@ -213,7 +206,7 @@
     <input type="file" id="import-file" class="hidden-input" accept=".json" onchange="app.importData(this)" />
 
     <script src="scripts/app.js"></script>
-    <script src="scripts/CodebergSync.js"></script>
+    <script src="scripts/GitHubSync.js"></script>
 </body>
 
 </html>
