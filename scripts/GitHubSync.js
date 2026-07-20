@@ -15,6 +15,8 @@ var GitHubSync = (function () {
     config.token = token;
     config.branch = branch;
 
+    console.log("GitHub settings loaded:", { token: token ? "***" : "(empty)", branch, owner: config.owner, repo: config.repo, filepath: config.filepath });
+
     // Populate input fields if they exist
     const tokenEl = document.getElementById("github-token");
     const branchEl = document.getElementById("github-branch");
@@ -91,24 +93,35 @@ var GitHubSync = (function () {
 
     const data = await response.json();
 
-    if (!data.content) {
-      throw new Error("No content in GitHub response - file may be empty or API response malformed");
+    let contentStr;
+
+    // For large files, GitHub doesn't include content inline; use download_url instead
+    if (!data.content || data.encoding === "none") {
+      if (data.download_url) {
+        const downloadResponse = await fetch(data.download_url);
+        if (!downloadResponse.ok) {
+          throw new Error(`Failed to download file from download_url: ${downloadResponse.statusText}`);
+        }
+        contentStr = await downloadResponse.text();
+      } else {
+        throw new Error("File is too large or empty; no download_url provided");
+      }
+    } else {
+      // For smaller files, decode the base64 content
+      try {
+        contentStr = decodeURIComponent(escape(atob(data.content)));
+      } catch (err) {
+        throw new Error(`Failed to decode base64 content: ${err.message}`);
+      }
     }
 
-    let decoded;
-    try {
-      decoded = decodeURIComponent(escape(atob(data.content)));
-    } catch (err) {
-      throw new Error(`Failed to decode base64 content: ${err.message}`);
-    }
-
-    if (!decoded || decoded.trim() === "") {
-      throw new Error("Decoded content is empty");
+    if (!contentStr || contentStr.trim() === "") {
+      throw new Error("Content is empty");
     }
 
     let parsed;
     try {
-      parsed = JSON.parse(decoded);
+      parsed = JSON.parse(contentStr);
     } catch (err) {
       throw new Error(`Failed to parse JSON: ${err.message}`);
     }
